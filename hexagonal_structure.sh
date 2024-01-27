@@ -224,6 +224,8 @@ package $BASE_PACKAGE.$RESOURCE_NAME.$PACKAGE_PATH;
 
 import $BASE_PACKAGE.$RESOURCE_NAME.domain.port.in.*;
 import lombok.AllArgsConstructor;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @AllArgsConstructor
 public class ${CLASS_NAME} {
@@ -255,11 +257,74 @@ EOL
 
   for RESPONSE in "${RESPONSES[@]}"; do
     IFS='|' read -r HAS_RESPONSE COLLECTION USE_CASE <<< "$RESPONSE"
-    LOWERCASE_USE_CASE=$(lowercase_first $USE_CASE)
+        if [ "$HAS_RESPONSE" = "true" ]; then
+          RETURN_WORD="return"
+          if [ "$COLLECTION" = "true" ]; then
+            METHOD_RESPONSE="Flux<${RESOURCE_NAME}Dto>"
+          else
+            METHOD_RESPONSE="Mono<${RESOURCE_NAME}Dto>"
+          fi
+        else
+          RETURN_WORD=""
+          METHOD_RESPONSE="void"
+        fi
+
+LOWERCASE_USE_CASE=$(lowercase_first $USE_CASE)
 
     echo "    public $METHOD_RESPONSE ${LOWERCASE_USE_CASE}() {" >> $SERVICE_FILE
     echo "        ${LOWERCASE_USE_CASE}${USE_CASE_SUXFIX}.${LOWERCASE_USE_CASE}();" >> $SERVICE_FILE
     echo "    }" >> $SERVICE_FILE
+  done
+
+  cat <<EOL >> $SERVICE_FILE
+  }
+EOL
+
+  echo "Archivo $SERVICE_FILE creado con éxito."
+}
+
+create_service_repository_interface_file(){
+  local SERVICE_FILE=$1
+  local CLASS_NAME=$2
+  local PACKAGE_PATH=$3
+  local RESPONSES=("${@:4}")
+
+  if [ -e "$SERVICE_FILE" ]; then
+    read -p "¡Atención! El archivo $SERVICE_FILE ya existe. ¿Quieres sobrescribirlo? (S/n): " OVERWRITE_SERVICE
+    if [ "$OVERWRITE_SERVICE" != "S" ] && [ "$OVERWRITE_SERVICE" != "s" ]; then
+      echo "Operación cancelada para $SERVICE_FILE."
+      exit 1
+    fi
+  fi
+
+  cat <<EOL > $SERVICE_FILE
+package $BASE_PACKAGE.$RESOURCE_NAME.$PACKAGE_PATH;
+
+import $BASE_PACKAGE.$RESOURCE_NAME.domain.port.in.*;
+import $BASE_PACKAGE.$RESOURCE_NAME.domain.model.${RESOURCE_NAME}Dto.java;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+public interface ${CLASS_NAME} {
+EOL
+
+  for RESPONSE in "${RESPONSES[@]}"; do
+    IFS='|' read -r HAS_RESPONSE COLLECTION USE_CASE <<< "$RESPONSE"
+        if [ "$HAS_RESPONSE" = "true" ]; then
+          RETURN_WORD="return"
+          if [ "$COLLECTION" = "true" ]; then
+            METHOD_RESPONSE="Flux<${RESOURCE_NAME}Dto>"
+          else
+            METHOD_RESPONSE="Mono<${RESOURCE_NAME}Dto>"
+          fi
+        else
+          RETURN_WORD=""
+          METHOD_RESPONSE="void"
+        fi
+
+LOWERCASE_USE_CASE=$(lowercase_first $USE_CASE)
+
+    echo "    $METHOD_RESPONSE ${LOWERCASE_USE_CASE}();" >> $SERVICE_FILE
   done
 
   cat <<EOL >> $SERVICE_FILE
@@ -287,11 +352,11 @@ for USE_CASE in $USE_CASES; do
   create_use_case_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/domain/port/in/${USE_CASE}UseCase.java" "${USE_CASE}UseCase" "domain.port.in" "interface" "$HAS_RESPONSE" "$COLLECTION"
 done
 
-# Crear la interfaz de repositorio en domain/port/out
-  create_use_case_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/domain/port/out/${USE_CASE}RepositoryPort.java" "${USE_CASE}RepositoryPort" "domain.port.out" "interface" "$HAS_RESPONSE" "$COLLECTION"
-
 # Crear archivo de implementación de repositorio en infrastructure/repository
 create_use_case_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/adapter/out/RepositoryAdapter.java" "RepositoryAdapter" "infrastructure.adapter.out" "class"
+
+# Crear la interfaz de repositorio en domain/port/out
+create_service_repository_interface_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/domain/port/out/${RESOURCE_NAME}RepositoryPort.java" "${RESOURCE_NAME}RepositoryPort" "domain.port.out" "${RESPONSES[@]}"
 
 # Crear archivos de servicio
 create_service_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/application/service/${RESOURCE_NAME}Service.java" "${RESOURCE_NAME}Service" "application.service" "${RESPONSES[@]}"
