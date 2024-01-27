@@ -30,7 +30,7 @@ mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/domain/port/out
 mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/adapter/in
 mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/adapter/out
 mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/config
-mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/repository
+mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/repositories
 mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/utils
 mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/entities
 
@@ -335,6 +335,98 @@ EOL
   echo "Archivo $SERVICE_FILE creado con éxito."
 }
 
+create_repository_adapter_file(){
+  local SERVICE_FILE=$1
+  local CLASS_NAME=$2
+  local PACKAGE_PATH=$3
+  local RESPONSES=("${@:4}")
+
+  if [ -e "$SERVICE_FILE" ]; then
+    read -p "¡Atención! El archivo $SERVICE_FILE ya existe. ¿Quieres sobrescribirlo? (S/n): " OVERWRITE_SERVICE
+    if [ "$OVERWRITE_SERVICE" != "S" ] && [ "$OVERWRITE_SERVICE" != "s" ]; then
+      echo "Operación cancelada para $SERVICE_FILE."
+      exit 1
+    fi
+  fi
+
+  INJECTION_STRING="Reactive${RESOURCE_NAME}Repository"
+  CLASS_IMPLEMENT="${RESOURCE_NAME}RepositoryPort"
+
+  cat <<EOL > $SERVICE_FILE
+package $BASE_PACKAGE.$RESOURCE_NAME.$PACKAGE_PATH;
+
+import $BASE_PACKAGE.$RESOURCE_NAME.domain.port.out.${RESOURCE_NAME}RepositoryPort.java;
+import $BASE_PACKAGE.$RESOURCE_NAME.domain.model.${RESOURCE_NAME}Dto.java;
+import lombok.AllArgsConstructor;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Component
+@AllArgsConstructor
+public class ${CLASS_NAME} implements ${CLASS_IMPLEMENT} {
+
+    private final ${INJECTION_STRING} $(lowercase_first $INJECTION_STRING);
+
+EOL
+
+  for RESPONSE in "${RESPONSES[@]}"; do
+    IFS='|' read -r HAS_RESPONSE COLLECTION USE_CASE <<< "$RESPONSE"
+        if [ "$HAS_RESPONSE" = "true" ]; then
+          RETURN_WORD="return"
+          if [ "$COLLECTION" = "true" ]; then
+            METHOD_RESPONSE="Flux<${RESOURCE_NAME}Dto>"
+          else
+            METHOD_RESPONSE="Mono<${RESOURCE_NAME}Dto>"
+          fi
+        else
+          RETURN_WORD=""
+          METHOD_RESPONSE="void"
+        fi
+
+LOWERCASE_USE_CASE=$(lowercase_first $USE_CASE)
+
+echo "    @Override
+    public $METHOD_RESPONSE ${LOWERCASE_USE_CASE}(){
+        $RETURN_WORD $(lowercase_first $INJECTION_STRING).${LOWERCASE_USE_CASE}();
+    }" >> $SERVICE_FILE
+  done
+
+  cat <<EOL >> $SERVICE_FILE
+}
+EOL
+
+  echo "Archivo $SERVICE_FILE creado con éxito."
+}
+
+create_repository_interface_file(){
+  local SERVICE_FILE=$1
+  local CLASS_NAME=$2
+  local PACKAGE_PATH=$3
+
+  if [ -e "$SERVICE_FILE" ]; then
+    read -p "¡Atención! El archivo $SERVICE_FILE ya existe. ¿Quieres sobrescribirlo? (S/n): " OVERWRITE_SERVICE
+    if [ "$OVERWRITE_SERVICE" != "S" ] && [ "$OVERWRITE_SERVICE" != "s" ]; then
+      echo "Operación cancelada para $SERVICE_FILE."
+      exit 1
+    fi
+  fi
+
+  cat <<EOL > $SERVICE_FILE
+package $BASE_PACKAGE.$RESOURCE_NAME.$PACKAGE_PATH;
+
+import $BASE_PACKAGE.$RESOURCE_NAME.infrastructure.entities.${RESOURCE_NAME}Entity.java;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface ${CLASS_NAME} extends ReactiveCrudRepository<${RESOURCE_NAME}Entity, Long> {
+}
+EOL
+
+  echo "Archivo $SERVICE_FILE creado con éxito."
+}
+
 # Crear DTO en domain/model
 create_dto_entity_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/domain/model/${RESOURCE_NAME}Dto.java" "${RESOURCE_NAME}Dto" "domain.model" "false"
 create_dto_entity_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/entities/${RESOURCE_NAME}Entity.java" "${RESOURCE_NAME}Entity" "infrastructure.entities" "true"
@@ -355,7 +447,11 @@ for USE_CASE in $USE_CASES; do
 done
 
 # Crear archivo de implementación de repositorio en infrastructure/repository
-create_use_case_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/adapter/out/RepositoryAdapter.java" "RepositoryAdapter" "infrastructure.adapter.out" "class"
+create_repository_adapter_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/repositories/Reactive${RESOURCE_NAME}Adapter.java" "Reactive${RESOURCE_NAME}Adapter" "infrastructure.repositories" "${RESPONSES[@]}"
+
+# Crear archivo de interfa de repositorio en infrastructure/repository
+create_repository_interface_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/repositories/Reactive${RESOURCE_NAME}Repository.java" "Reactive${RESOURCE_NAME}Repository" "infrastructure.repositories"
+"infrastructure.repositories" "${RESPONSES[@]}"
 
 # Crear la interfaz de repositorio en domain/port/out
 create_service_repository_interface_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/domain/port/out/${RESOURCE_NAME}RepositoryPort.java" "${RESOURCE_NAME}RepositoryPort" "domain.port.out" "${RESPONSES[@]}"
