@@ -32,6 +32,7 @@ mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/adapter/out
 mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/config
 mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/repository
 mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/utils
+mkdir -p src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/entities
 
 
 lowercase_first() {
@@ -157,7 +158,7 @@ EOL
   echo "Archivo $FILE_PATH creado con éxito."
 }
 
-create_dto_file() {
+create_dto_entity_file() {
   local FILE_PATH=$1
   local CLASS_NAME=$2
   local PACKAGE_PATH=$3
@@ -328,14 +329,15 @@ LOWERCASE_USE_CASE=$(lowercase_first $USE_CASE)
   done
 
   cat <<EOL >> $SERVICE_FILE
-  }
+}
 EOL
 
   echo "Archivo $SERVICE_FILE creado con éxito."
 }
 
 # Crear DTO en domain/model
-create_dto_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/domain/model/${RESOURCE_NAME}Dto.java" "${RESOURCE_NAME}Dto" "domain.model" "false"
+create_dto_entity_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/domain/model/${RESOURCE_NAME}Dto.java" "${RESOURCE_NAME}Dto" "domain.model" "false"
+create_dto_entity_file "src/main/java/$BASE_PACKAGE/$RESOURCE_NAME/infrastructure/entities/${RESOURCE_NAME}Entity.java" "${RESOURCE_NAME}Entity" "infrastructure.entities" "true"
 
 # Crear archivos de ejemplo para cada caso de uso
 read -p "Ingresa los casos de uso separados por espacios (por ejemplo, CasoUso1 CasoUso2): " USE_CASES
